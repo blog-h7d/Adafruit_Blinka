@@ -22,7 +22,7 @@ _led_strip = None
 _buf = None
 
 
-def neopixel_write(gpio, buf):
+def neopixel_write(gpio, buf, led_channel: int = LED_CHANNEL):
     """NeoPixel Writing Function"""
     global _led_strip  # we'll have one strip we init if its not at first
     global _buf  # we save a reference to the buf, and if it changes we will cleanup and re-init.
@@ -46,7 +46,7 @@ def neopixel_write(gpio, buf):
             ws.ws2811_channel_t_invert_set(channel, 0)
             ws.ws2811_channel_t_brightness_set(channel, 0)
 
-        channel = ws.ws2811_channel_get(_led_strip, LED_CHANNEL)
+        channel = ws.ws2811_channel_get(_led_strip, led_channel)
 
         # Initialize the channel in use
         count = 0
@@ -84,7 +84,7 @@ def neopixel_write(gpio, buf):
             )
         atexit.register(neopixel_cleanup)
 
-    channel = ws.ws2811_channel_get(_led_strip, LED_CHANNEL)
+    channel = ws.ws2811_channel_get(_led_strip, led_channel)
     if gpio._pin.id != ws.ws2811_channel_t_gpionum_get(channel):
         raise RuntimeError("Raspberry Pi neopixel support is for one strip only!")
 
