@@ -41,6 +41,6 @@ else:
     raise NotImplementedError("Board not supported")
 
 
-def neopixel_write(gpio, buf):
+def neopixel_write(gpio, buf, channel: int = 0):
     """Write buf out on the given DigitalInOut."""
-    return _neopixel.neopixel_write(gpio, buf)
+    return _neopixel.neopixel_write(gpio, buf, channel)
