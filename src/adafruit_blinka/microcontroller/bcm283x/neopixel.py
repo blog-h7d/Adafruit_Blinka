@@ -113,8 +113,8 @@ def neopixel_cleanup(channel=None):
     for strip_channel, strip in _led_strips.items():
         if channel is None or channel == strip_channel:
             # Ensure ws2811_fini is called before the program quits.
-            ws.ws2811_fini(led_strip)
+            ws.ws2811_fini(strip)
             # Example of calling delete function to clean up structure memory.  Isn't
             # strictly necessary at the end of the program execution here, but is good practice.
-            ws.delete_ws2811_t(led_strip)
+            ws.delete_ws2811_t(strip)
             del _led_strips[strip_channel]
