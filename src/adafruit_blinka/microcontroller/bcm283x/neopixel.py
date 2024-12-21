@@ -16,37 +16,32 @@ LED_BRIGHTNESS = 255  # We manage the brightness in the neopixel library
 LED_INVERT = 0  # We don't support inverted logic
 LED_STRIP = None  # We manage the color order within the neopixel library
 
-# a 'static' object that we will use to manage our PWM DMA channel
-# we only support one LED strip per raspi
-_led_strip = None
-_buf = None
+_led_strips: dict[int:object] = {}
 
 
 def neopixel_write(gpio, buf, led_channel: int = LED_CHANNEL):
     """NeoPixel Writing Function"""
-    global _led_strip  # we'll have one strip we init if its not at first
-    global _buf  # we save a reference to the buf, and if it changes we will cleanup and re-init.
+    global _led_strips  # we'll have one strip we init if its not at first
 
-    if _led_strip is None or buf is not _buf:
+    if (led_strip := _led_strips.get(led_channel)) is None:
         # This is safe to call since it doesn't do anything if _led_strip is None
-        neopixel_cleanup()
+        neopixel_cleanup(led_channel)
 
         # Create a ws2811_t structure from the LED configuration.
         # Note that this structure will be created on the heap so you
         # need to be careful that you delete its memory by calling
         # delete_ws2811_t when it's not needed.
-        _led_strip = ws.new_ws2811_t()
-        _buf = buf
+        led_strip = ws.new_ws2811_t()
 
         # Initialize all channels to off
         for channum in range(2):
-            channel = ws.ws2811_channel_get(_led_strip, channum)
+            channel = ws.ws2811_channel_get(led_strip, channum)
             ws.ws2811_channel_t_count_set(channel, 0)
             ws.ws2811_channel_t_gpionum_set(channel, 0)
             ws.ws2811_channel_t_invert_set(channel, 0)
             ws.ws2811_channel_t_brightness_set(channel, 0)
 
-        channel = ws.ws2811_channel_get(_led_strip, led_channel)
+        channel = ws.ws2811_channel_get(led_strip, led_channel)
 
         # Initialize the channel in use
         count = 0
@@ -69,10 +64,10 @@ def neopixel_write(gpio, buf, led_channel: int = LED_CHANNEL):
         ws.ws2811_channel_t_strip_type_set(channel, LED_STRIP)
 
         # Initialize the controller
-        ws.ws2811_t_freq_set(_led_strip, LED_FREQ_HZ)
-        ws.ws2811_t_dmanum_set(_led_strip, LED_DMA_NUM)
+        ws.ws2811_t_freq_set(led_strip, LED_FREQ_HZ)
+        ws.ws2811_t_dmanum_set(led_strip, LED_DMA_NUM)
 
-        resp = ws.ws2811_init(_led_strip)
+        resp = ws.ws2811_init(led_strip)
         if resp != ws.WS2811_SUCCESS:
             if resp == -5:
                 raise RuntimeError(
@@ -83,8 +78,9 @@ def neopixel_write(gpio, buf, led_channel: int = LED_CHANNEL):
                 "ws2811_init failed with code {0} ({1})".format(resp, message)
             )
         atexit.register(neopixel_cleanup)
+        _led_strips[led_channel] = led_strip
 
-    channel = ws.ws2811_channel_get(_led_strip, led_channel)
+    channel = ws.ws2811_channel_get(led_strip, led_channel)
     if gpio._pin.id != ws.ws2811_channel_t_gpionum_get(channel):
         raise RuntimeError("Raspberry Pi neopixel support is for one strip only!")
 
@@ -104,7 +100,7 @@ def neopixel_write(gpio, buf, led_channel: int = LED_CHANNEL):
             pixel = (w << 24) | (r << 16) | (g << 8) | b
         ws.ws2811_led_set(channel, i, pixel)
 
-    resp = ws.ws2811_render(_led_strip)
+    resp = ws.ws2811_render(led_strip)
     if resp != ws.WS2811_SUCCESS:
         message = ws.ws2811_get_return_t_str(resp)
         raise RuntimeError(
@@ -113,14 +109,12 @@ def neopixel_write(gpio, buf, led_channel: int = LED_CHANNEL):
     time.sleep(0.001 * ((len(buf) // 100) + 1))  # about 1ms per 100 bytes
 
 
-def neopixel_cleanup():
-    """Cleanup when we're done"""
-    global _led_strip
-
-    if _led_strip is not None:
-        # Ensure ws2811_fini is called before the program quits.
-        ws.ws2811_fini(_led_strip)
-        # Example of calling delete function to clean up structure memory.  Isn't
-        # strictly necessary at the end of the program execution here, but is good practice.
-        ws.delete_ws2811_t(_led_strip)
-        _led_strip = None
+def neopixel_cleanup(channel=None):
+    for strip_channel, strip in _led_strips.items():
+        if channel is None or channel == strip_channel:
+            # Ensure ws2811_fini is called before the program quits.
+            ws.ws2811_fini(led_strip)
+            # Example of calling delete function to clean up structure memory.  Isn't
+            # strictly necessary at the end of the program execution here, but is good practice.
+            ws.delete_ws2811_t(led_strip)
+            del _led_strips[strip_channel]
