@@ -90,9 +90,7 @@ def neopixel_write(gpio, buf, led_channel: int = LED_CHANNEL):
         bpp = 4
     # assign all colors!
     for i in range(len(buf) // bpp):
-        r = buf[bpp * i]
-        g = buf[bpp * i + 1]
-        b = buf[bpp * i + 2]
+        r, g, b = buf[bpp * i: bpp * i + 3]
         if bpp == 3:
             pixel = (r << 16) | (g << 8) | b
         else:
